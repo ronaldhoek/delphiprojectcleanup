@@ -125,6 +125,7 @@ var
   _PropertyNode, _CurSubNode: IXMLNode;
   _Root: IXMLNode;
   _Log: TStrings;
+  _FileStrings: TStrings;
 begin
   // Open file
   Result := False;
@@ -208,6 +209,20 @@ begin
   finally
     _Log.Free;
     XMLDocument1.Active := False; // Close
+  end;
+
+  // Even format van Delphi hanteren (extra tab voor elke regel)
+  if Result then
+  begin
+    _FileStrings := TStringList.Create;
+    try
+      _FileStrings.LoadFromFile(aFilename);
+      for I := 0 to _FileStrings.Count - 1 do
+        _FileStrings[I] := #9 + _FileStrings[I]; // Extra tab toevoegen voor elke regel
+      _FileStrings.SaveToFile(aFilename);
+    finally
+      _FileStrings.Free;
+    end;
   end;
 end;
 
