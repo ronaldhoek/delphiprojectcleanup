@@ -9,7 +9,7 @@ uses
   JvComponentBase, JvAppStorage, JvAppIniStorage;
 
 type
-  TCleanOptions = set of (coCreateBackup, coVerInfo, coMainIcon, coManifest);
+  TCleanOptions = set of (coCreateBackup, coCreateLog, coVerInfo, coMainIcon, coManifest);
 
   TfrmMain = class(TForm)
     ActionList1: TActionList;
@@ -30,6 +30,7 @@ type
     lvProjects: TListView;
     ProgressBar1: TProgressBar;
     XMLDocument1: TXMLDocument;
+    cbCreateLog: TCheckBox;
     procedure actnAddProjectsAccept(Sender: TObject);
     procedure actnExecuteExecute(Sender: TObject);
     procedure actnExecuteUpdate(Sender: TObject);
@@ -90,7 +91,7 @@ begin
     end;
     lvProjects.Invalidate;
   end else
-    ShowMessage('No cleanup options selected!');
+    ShowMessage('No cleanup actions selected!');
 end;
 
 procedure TfrmMain.actnExecuteUpdate(Sender: TObject);
@@ -201,7 +202,8 @@ begin
           raise Exception.Create('Cannot create backup!');
 
       // Save log
-      _Log.SaveToFile(aFilename + '.log');
+      if (coCreateLog in aCleanupOptions) then
+        _Log.SaveToFile(aFilename + '.log');
 
       // Save file again
       XMLDocument1.SaveToFile();
@@ -244,6 +246,7 @@ begin
   begin
     // Backup optie nog toevoegen
     if cbCreateBackup.Checked then Include(oOptions, coCreateBackup);
+    if cbCreateLog.Checked then Include(oOptions, coCreateLog);
     Result := True;
   end else
     Result := False;

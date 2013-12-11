@@ -45,7 +45,7 @@ object frmMain: TfrmMain
     Left = 8
     Top = 39
     Width = 361
-    Height = 176
+    Height = 177
     Anchors = [akLeft, akTop, akRight, akBottom]
     Columns = <
       item
@@ -96,9 +96,9 @@ object frmMain: TfrmMain
   end
   object GroupBox1: TGroupBox
     Left = 8
-    Top = 221
+    Top = 222
     Width = 208
-    Height = 86
+    Height = 85
     Anchors = [akLeft, akRight, akBottom]
     Caption = 'Options'
     TabOrder = 3
@@ -139,6 +139,16 @@ object frmMain: TfrmMain
       Height = 17
       Caption = 'Clean up inherited Manifest File info'
       TabOrder = 2
+    end
+    object cbCreateLog: TCheckBox
+      Left = 102
+      Top = 65
+      Width = 74
+      Height = 17
+      Caption = 'Create log'
+      Checked = True
+      State = cbChecked
+      TabOrder = 4
     end
   end
   object ActionList1: TActionList
@@ -187,6 +197,12 @@ object frmMain: TfrmMain
     AppStoragePath = '%FORM_NAME%\'
     OnSavePlacement = JvFormStorage1SavePlacement
     OnRestorePlacement = JvFormStorage1RestorePlacement
+    StoredProps.Strings = (
+      'cbCleanMainIcon.Checked'
+      'cbCleanManifest.Checked'
+      'cbCleanVerInfo.Checked'
+      'cbCreateBackup.Checked'
+      'cbCreateLog.Checked')
     StoredValues = <>
     Left = 280
     Top = 136
