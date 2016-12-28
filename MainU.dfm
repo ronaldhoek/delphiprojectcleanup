@@ -20,7 +20,7 @@ object frmMain: TfrmMain
     346)
   PixelsPerInch = 96
   TextHeight = 13
-  object Label1: TLabel
+  object lblInfo: TLabel
     Left = 222
     Top = 228
     Width = 139
@@ -40,6 +40,15 @@ object frmMain: TfrmMain
     WordWrap = True
     ExplicitLeft = 214
     ExplicitTop = 279
+  end
+  object lblProjectCount: TLabel
+    Left = 293
+    Top = 23
+    Width = 73
+    Height = 13
+    Alignment = taRightJustify
+    Anchors = [akTop, akRight]
+    Caption = 'lblProjectCount'
   end
   object lvProjects: TListView
     Left = 8

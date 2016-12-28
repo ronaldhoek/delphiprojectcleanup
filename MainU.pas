@@ -23,14 +23,15 @@ type
     cbCleanManifest: TCheckBox;
     cbCleanVerInfo: TCheckBox;
     cbCreateBackup: TCheckBox;
+    cbCreateLog: TCheckBox;
     GroupBox1: TGroupBox;
     JvAppIniFileStorage1: TJvAppIniFileStorage;
     JvFormStorage1: TJvFormStorage;
-    Label1: TLabel;
+    lblInfo: TLabel;
+    lblProjectCount: TLabel;
     lvProjects: TListView;
     ProgressBar1: TProgressBar;
     XMLDocument1: TXMLDocument;
-    cbCreateLog: TCheckBox;
     procedure actnAddProjectsAccept(Sender: TObject);
     procedure actnExecuteExecute(Sender: TObject);
     procedure actnExecuteUpdate(Sender: TObject);
@@ -45,6 +46,7 @@ type
     function CleanupProjectFile(const aFilename: string; aCleanupOptions:
         TCleanOptions): Boolean;
     function GetCleanOptions(out oOptions: TCleanOptions): Boolean;
+    procedure ProjectCountUpdated;
   protected
     procedure ListItemsDeleteItem(Sender: TJvCustomAppStorage; const Path: string;
         const List: TObject; const First, Last: Integer; const ItemName: string);
@@ -102,6 +104,7 @@ end;
 procedure TfrmMain.actnRemoveProjectsExecute(Sender: TObject);
 begin
   lvProjects.DeleteSelected;
+  ProjectCountUpdated;
 end;
 
 procedure TfrmMain.actnRemoveProjectsUpdate(Sender: TObject);
@@ -113,7 +116,10 @@ procedure TfrmMain.AddFile(aFilename: string);
 begin
   if FileExists(aFilename) and
      (lvProjects.FindCaption(0, aFilename, False, True, False) = nil) then
+  begin
     lvProjects.Items.Add.Caption := aFilename;
+    ProjectCountUpdated;
+  end;
 end;
 
 function TfrmMain.CleanupProjectFile(const aFilename: string; aCleanupOptions:
@@ -266,6 +272,7 @@ begin
   finally
     lvProjects.Items.EndUpdate;
   end;
+  ProjectCountUpdated;
 end;
 
 procedure TfrmMain.JvFormStorage1SavePlacement(Sender: TObject);
@@ -316,6 +323,14 @@ begin
       Sender.WriteString(Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]), Item.Caption);
       // Sender.WritePersistent(Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]), TPersistent(Item));
   end;
+end;
+
+procedure TfrmMain.ProjectCountUpdated;
+begin
+  lblProjectCount.Caption := Format('Aantal projecten: %d', [lvProjects.Items.Count]);
+  // Resize forceren
+  lvProjects.Width := lvProjects.Width + 1;
+  lvProjects.Width := lvProjects.Width - 1;
 end;
 
 procedure TfrmMain.WMDropFiles(var Message: TWMDropFiles);
