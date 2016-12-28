@@ -327,7 +327,7 @@ end;
 
 procedure TfrmMain.ProjectCountUpdated;
 begin
-  lblProjectCount.Caption := Format('Aantal projecten: %d', [lvProjects.Items.Count]);
+  lblProjectCount.Caption := Format('Number of  projects: %d', [lvProjects.Items.Count]);
   // Resize forceren
   lvProjects.Width := lvProjects.Width + 1;
   lvProjects.Width := lvProjects.Width - 1;
