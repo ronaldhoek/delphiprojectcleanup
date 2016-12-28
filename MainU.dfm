@@ -166,7 +166,7 @@ object frmMain: TfrmMain
     object actnAddProjects: TFileOpen
       Caption = 'Add projects'
       Dialog.DefaultExt = 'dproj'
-      Dialog.Filter = 'Delphi project files|*.dproj'
+      Dialog.Filter = 'Delphi project(group) files|*.dproj;*.groupproj'
       Dialog.Options = [ofAllowMultiSelect, ofPathMustExist, ofFileMustExist, ofEnableSizing]
       Dialog.Title = 'Select Delphi projects'
       Hint = 'Add projects to convert'

@@ -42,10 +42,12 @@ type
     procedure JvFormStorage1SavePlacement(Sender: TObject);
     procedure WMDropFiles(var Message: TWMDropFiles); message WM_DROPFILES;
   private
-    procedure AddFile(aFilename: string);
-    function CleanupProjectFile(const aFilename: string; aCleanupOptions:
-        TCleanOptions): Boolean;
+    procedure AddFile(const aFilename: string);
+    procedure AddGroupProjects(const aFilename: string);
+    procedure AddProject(const aFilename: string);
     function GetCleanOptions(out oOptions: TCleanOptions): Boolean;
+    function ProcessProject(const aFilename: string; aCleanupOptions:
+        TCleanOptions): Boolean;
     procedure ProjectCountUpdated;
   protected
     procedure ListItemsDeleteItem(Sender: TJvCustomAppStorage; const Path: string;
@@ -72,6 +74,7 @@ var
 begin
   with (Sender as TFileOpen).Dialog do
     for S in Files do AddFile(S);
+  ProjectCountUpdated;
 end;
 
 procedure TfrmMain.actnExecuteExecute(Sender: TObject);
@@ -86,7 +89,7 @@ begin
     for I := 0 to lvProjects.Items.Count - 1 do
     begin
       lvProjects.Items[I].SubItems.Clear;
-      if CleanupProjectFile(lvProjects.Items[I].Caption, _CleanOptions) then
+      if ProcessProject(lvProjects.Items[I].Caption, _CleanOptions) then
         lvProjects.Items[I].SubItems.Add('*');
 
       ProgressBar1.StepBy(1);
@@ -112,17 +115,130 @@ begin
   (Sender as TCustomAction).Enabled := lvProjects.SelCount > 0;
 end;
 
-procedure TfrmMain.AddFile(aFilename: string);
+procedure TfrmMain.AddFile(const aFilename: string);
+begin
+  if SameText(ExtractFileExt(aFilename), '.dproj') then
+    AddProject(aFilename)
+  else if SameText(ExtractFileExt(aFilename), '.groupproj') then
+    AddGroupProjects(aFilename);
+end;
+
+procedure TfrmMain.AddGroupProjects(const aFilename: string);
+var
+  xmlGroup: IXMLDocument;
+  xmlNode: IXMLNode;
+  I: Integer;
+begin
+  xmlGroup := LoadXMLDocument(aFilename);
+  xmlNode := xmlGroup.ChildNodes.FindNode('Project');
+  if xmlNode = nil then Exit;
+  xmlNode := xmlNode.ChildNodes.FindNode('ItemGroup');
+  if xmlNode = nil then Exit;
+
+  for I := 0 to xmlNode.ChildNodes.Count - 1 do
+    if xmlNode.ChildNodes[I].NodeName = 'Projects' then
+      AddProject(ExtractFilePath(aFilename) + VarTosTr(xmlNode.ChildNodes[I].Attributes['Include']));
+end;
+
+procedure TfrmMain.AddProject(const aFilename: string);
 begin
   if FileExists(aFilename) and
      (lvProjects.FindCaption(0, aFilename, False, True, False) = nil) then
-  begin
     lvProjects.Items.Add.Caption := aFilename;
-    ProjectCountUpdated;
+end;
+
+procedure TfrmMain.FormCreate(Sender: TObject);
+begin
+  DragAcceptFiles(Handle, True);
+  JvAppIniFileStorage1.FileName := ChangeFileExt(Application.ExeName, '.ini');
+end;
+
+function TfrmMain.GetCleanOptions(out oOptions: TCleanOptions): Boolean;
+begin
+  oOptions := [];
+  // Items to cleanup
+  if cbCleanVerInfo.Checked then Include(oOptions, coVerInfo);
+  if cbCleanMainIcon.Checked then Include(oOptions, coMainIcon);
+  if cbCleanManifest.Checked then Include(oOptions, coManifest);
+
+  if oOptions <> [] then
+  begin
+    // Backup optie nog toevoegen
+    if cbCreateBackup.Checked then Include(oOptions, coCreateBackup);
+    if cbCreateLog.Checked then Include(oOptions, coCreateLog);
+    Result := True;
+  end else
+    Result := False;
+end;
+
+procedure TfrmMain.JvFormStorage1RestorePlacement(Sender: TObject);
+var
+  FormStore: TJvFormStorage;
+  sPath: String;
+begin
+  FormStore := (Sender as TJvFormStorage);
+  sPath := FormStore.AppStorage.ConcatPaths([FormStore.AppStoragePath, FormStore.StoredPropsPath, 'LastItems']);
+
+  lvProjects.Items.BeginUpdate;
+  try
+    FormStore.AppStorage.ReadList(sPath, lvProjects.Items, ListItemsReadItem);
+  finally
+    lvProjects.Items.EndUpdate;
+  end;
+  ProjectCountUpdated;
+end;
+
+procedure TfrmMain.JvFormStorage1SavePlacement(Sender: TObject);
+var
+  FormStore: TJvFormStorage;
+  sPath: String;
+begin
+  FormStore := (Sender as TJvFormStorage);
+  sPath := FormStore.AppStorage.ConcatPaths([FormStore.AppStoragePath, FormStore.StoredPropsPath, 'LastItems']);
+  FormStore.AppStorage.WriteList(sPath, lvProjects.Items, lvProjects.Items.Count, ListItemsWriteItem, ListItemsDeleteItem);
+end;
+
+procedure TfrmMain.ListItemsDeleteItem(Sender: TJvCustomAppStorage; const Path:
+    string; const List: TObject; const First, Last: Integer; const ItemName:
+    string);
+var
+  I: Integer;
+begin
+  if List is TListItems then
+    for I := First to Last do
+      Sender.DeleteValue(Sender.ConcatPaths([Path, ItemName + IntToStr(I)]));
+end;
+
+procedure TfrmMain.ListItemsReadItem(Sender: TJvCustomAppStorage; const Path:
+    string; const List: TObject; const Index: Integer; const ItemName: string);
+var
+  NewItem: TListItem;
+  NewPath: string;
+begin
+  if List is TListItems then
+  begin
+    NewPath := Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]);
+    NewItem := TListItems(List).Add;
+    NewItem.Caption := Sender.ReadString(NewPath);
+    // Sender.ReadPersistent(NewPath, NewItem);
   end;
 end;
 
-function TfrmMain.CleanupProjectFile(const aFilename: string; aCleanupOptions:
+procedure TfrmMain.ListItemsWriteItem(Sender: TJvCustomAppStorage; const Path:
+    string; const List: TObject; const Index: Integer; const ItemName: string);
+var
+  Item: TListItem;
+begin
+  if List is TListItems then
+  begin
+    Item := TListItems(List).Item[Index];
+    if Assigned(Item) then
+      Sender.WriteString(Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]), Item.Caption);
+      // Sender.WritePersistent(Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]), TPersistent(Item));
+  end;
+end;
+
+function TfrmMain.ProcessProject(const aFilename: string; aCleanupOptions:
     TCleanOptions): Boolean;
 const
   sVerinfoPrefix = 'VerInfo_';
@@ -234,97 +350,6 @@ begin
   end;
 end;
 
-procedure TfrmMain.FormCreate(Sender: TObject);
-begin
-  DragAcceptFiles(Handle, True);
-  JvAppIniFileStorage1.FileName := ChangeFileExt(Application.ExeName, '.ini');
-end;
-
-function TfrmMain.GetCleanOptions(out oOptions: TCleanOptions): Boolean;
-begin
-  oOptions := [];
-  // Items to cleanup
-  if cbCleanVerInfo.Checked then Include(oOptions, coVerInfo);
-  if cbCleanMainIcon.Checked then Include(oOptions, coMainIcon);
-  if cbCleanManifest.Checked then Include(oOptions, coManifest);
-
-  if oOptions <> [] then
-  begin
-    // Backup optie nog toevoegen
-    if cbCreateBackup.Checked then Include(oOptions, coCreateBackup);
-    if cbCreateLog.Checked then Include(oOptions, coCreateLog);
-    Result := True;
-  end else
-    Result := False;
-end;
-
-procedure TfrmMain.JvFormStorage1RestorePlacement(Sender: TObject);
-var
-  FormStore: TJvFormStorage;
-  sPath: String;
-begin
-  FormStore := (Sender as TJvFormStorage);
-  sPath := FormStore.AppStorage.ConcatPaths([FormStore.AppStoragePath, FormStore.StoredPropsPath, 'LastItems']);
-
-  lvProjects.Items.BeginUpdate;
-  try
-    FormStore.AppStorage.ReadList(sPath, lvProjects.Items, ListItemsReadItem);
-  finally
-    lvProjects.Items.EndUpdate;
-  end;
-  ProjectCountUpdated;
-end;
-
-procedure TfrmMain.JvFormStorage1SavePlacement(Sender: TObject);
-var
-  FormStore: TJvFormStorage;
-  sPath: String;
-begin
-  FormStore := (Sender as TJvFormStorage);
-  sPath := FormStore.AppStorage.ConcatPaths([FormStore.AppStoragePath, FormStore.StoredPropsPath, 'LastItems']);
-  FormStore.AppStorage.WriteList(sPath, lvProjects.Items, lvProjects.Items.Count, ListItemsWriteItem, ListItemsDeleteItem);
-end;
-
-procedure TfrmMain.ListItemsDeleteItem(Sender: TJvCustomAppStorage; const Path:
-    string; const List: TObject; const First, Last: Integer; const ItemName:
-    string);
-var
-  I: Integer;
-begin
-  if List is TListItems then
-    for I := First to Last do
-      Sender.DeleteValue(Sender.ConcatPaths([Path, ItemName + IntToStr(I)]));
-end;
-
-procedure TfrmMain.ListItemsReadItem(Sender: TJvCustomAppStorage; const Path:
-    string; const List: TObject; const Index: Integer; const ItemName: string);
-var
-  NewItem: TListItem;
-  NewPath: string;
-begin
-  if List is TListItems then
-  begin
-    NewPath := Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]);
-    NewItem := TListItems(List).Add;
-    NewItem.Caption := Sender.ReadString(NewPath);
-    // Sender.ReadPersistent(NewPath, NewItem);
-  end;
-end;
-
-procedure TfrmMain.ListItemsWriteItem(Sender: TJvCustomAppStorage; const Path:
-    string; const List: TObject; const Index: Integer; const ItemName: string);
-var
-  Item: TListItem;
-begin
-  if List is TListItems then
-  begin
-    Item := TListItems(List).Item[Index];
-    if Assigned(Item) then
-      Sender.WriteString(Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]), Item.Caption);
-      // Sender.WritePersistent(Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]), TPersistent(Item));
-  end;
-end;
-
 procedure TfrmMain.ProjectCountUpdated;
 begin
   lblProjectCount.Caption := Format('Number of  projects: %d', [lvProjects.Items.Count]);
@@ -348,6 +373,7 @@ begin
     AddFile(aFileName);
   end;
   DragFinish(Message.Drop);
+  ProjectCountUpdated;
 end;
 
 end.
