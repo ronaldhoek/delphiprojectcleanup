@@ -2,7 +2,7 @@ object frmMain: TfrmMain
   Left = 0
   Top = 0
   Caption = 'Cleanup converted projects'
-  ClientHeight = 346
+  ClientHeight = 342
   ClientWidth = 377
   Color = clBtnFace
   Constraints.MinHeight = 380
@@ -17,14 +17,14 @@ object frmMain: TfrmMain
   OnCreate = FormCreate
   DesignSize = (
     377
-    346)
+    342)
   PixelsPerInch = 96
   TextHeight = 13
   object lblInfo: TLabel
     Left = 222
-    Top = 228
+    Top = 200
     Width = 139
-    Height = 79
+    Height = 95
     Anchors = [akRight, akBottom]
     AutoSize = False
     Caption = 
@@ -38,8 +38,6 @@ object frmMain: TfrmMain
     Font.Style = []
     ParentFont = False
     WordWrap = True
-    ExplicitLeft = 214
-    ExplicitTop = 279
   end
   object lblProjectCount: TLabel
     Left = 293
@@ -54,7 +52,7 @@ object frmMain: TfrmMain
     Left = 8
     Top = 39
     Width = 361
-    Height = 177
+    Height = 139
     Anchors = [akLeft, akTop, akRight, akBottom]
     Columns = <
       item
@@ -88,26 +86,28 @@ object frmMain: TfrmMain
   end
   object btnExecute: TButton
     Left = 8
-    Top = 313
+    Top = 309
     Width = 97
     Height = 25
     Action = actnExecute
     Anchors = [akLeft, akBottom]
     TabOrder = 4
+    ExplicitTop = 313
   end
   object ProgressBar1: TProgressBar
     Left = 111
-    Top = 318
+    Top = 314
     Width = 258
     Height = 17
     Anchors = [akLeft, akRight, akBottom]
     TabOrder = 5
+    ExplicitTop = 318
   end
   object GroupBox1: TGroupBox
     Left = 8
-    Top = 222
+    Top = 184
     Width = 208
-    Height = 85
+    Height = 119
     Anchors = [akLeft, akRight, akBottom]
     Caption = 'Options'
     TabOrder = 3
@@ -116,6 +116,9 @@ object frmMain: TfrmMain
       Top = 16
       Width = 192
       Height = 17
+      Hint = 
+        'Removes versioninformation which is stored voor an specific buil' +
+        'd configuration'
       Caption = 'Clean up inherited version info'
       Checked = True
       State = cbChecked
@@ -123,41 +126,73 @@ object frmMain: TfrmMain
     end
     object cbCleanMainIcon: TCheckBox
       Left = 8
-      Top = 32
+      Top = 48
       Width = 192
       Height = 17
+      Hint = 
+        'Removes main icon specification which is stored voor an specific' +
+        ' build configuration'
       Caption = 'Clean up inherited main icon info'
+      Checked = True
+      State = cbChecked
+      TabOrder = 2
+    end
+    object cbCreateBackup: TCheckBox
+      Left = 8
+      Top = 80
+      Width = 97
+      Height = 17
+      Hint = 'Create a backup of the original file, before it is modified'
+      Caption = 'Create backup'
+      Checked = True
+      State = cbChecked
+      TabOrder = 4
+    end
+    object cbCleanManifest: TCheckBox
+      Left = 8
+      Top = 64
+      Width = 192
+      Height = 17
+      Hint = 
+        'Removes manifest information which is stored voor an specific bu' +
+        'ild configuration. USE WITH CARE (make backup!!!)'
+      Caption = 'Clean up inherited Manifest File info'
+      TabOrder = 3
+    end
+    object cbCreateLog: TCheckBox
+      Left = 102
+      Top = 81
+      Width = 74
+      Height = 17
+      Hint = 'Log modifications'
+      Caption = 'Create log'
+      Checked = True
+      State = cbChecked
+      TabOrder = 5
+    end
+    object cbCleanObsoleteVerinfo: TCheckBox
+      Left = 8
+      Top = 32
+      Width = 197
+      Height = 17
+      Hint = 
+        'Removes te '#39'old'#39' obsolete versioninformation from older Delphi v' +
+        'ersion'
+      Caption = 'Clean up '#39'old'#39' version info'
       Checked = True
       State = cbChecked
       TabOrder = 1
     end
-    object cbCreateBackup: TCheckBox
+    object cbOldStyleXMLFormat: TCheckBox
       Left = 8
-      Top = 64
-      Width = 97
+      Top = 96
+      Width = 185
       Height = 17
-      Caption = 'Create backup'
-      Checked = True
-      State = cbChecked
-      TabOrder = 3
-    end
-    object cbCleanManifest: TCheckBox
-      Left = 8
-      Top = 48
-      Width = 192
-      Height = 17
-      Caption = 'Clean up inherited Manifest File info'
-      TabOrder = 2
-    end
-    object cbCreateLog: TCheckBox
-      Left = 102
-      Top = 65
-      Width = 74
-      Height = 17
-      Caption = 'Create log'
-      Checked = True
-      State = cbChecked
-      TabOrder = 4
+      Hint = 
+        'With some Delphi versions (XE?) the projectfile XML uses TABs as' +
+        ' indents and adds one in front'
+      Caption = 'Old XML text format (XE?/older)'
+      TabOrder = 6
     end
   end
   object ActionList1: TActionList
@@ -211,7 +246,9 @@ object frmMain: TfrmMain
       'cbCleanManifest.Checked'
       'cbCleanVerInfo.Checked'
       'cbCreateBackup.Checked'
-      'cbCreateLog.Checked')
+      'cbCreateLog.Checked'
+      'cbCleanObsoleteVerinfo.Checked'
+      'cbOldStyleXMLFormat.Checked')
     StoredValues = <>
     Left = 280
     Top = 136

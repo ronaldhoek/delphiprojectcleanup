@@ -9,7 +9,8 @@ uses
   JvComponentBase, JvAppStorage, JvAppIniStorage;
 
 type
-  TCleanOptions = set of (coCreateBackup, coCreateLog, coVerInfo, coMainIcon, coManifest);
+  TCleanOptions = set of (coCreateBackup, coCreateLog, coOldStyleXMLformat,
+                          coVerInfo, coOldVerInfo, coMainIcon, coManifest);
 
   TfrmMain = class(TForm)
     ActionList1: TActionList;
@@ -21,9 +22,11 @@ type
     btnRemoveProjects: TButton;
     cbCleanMainIcon: TCheckBox;
     cbCleanManifest: TCheckBox;
+    cbCleanObsoleteVerinfo: TCheckBox;
     cbCleanVerInfo: TCheckBox;
     cbCreateBackup: TCheckBox;
     cbCreateLog: TCheckBox;
+    cbOldStyleXMLFormat: TCheckBox;
     GroupBox1: TGroupBox;
     JvAppIniFileStorage1: TJvAppIniFileStorage;
     JvFormStorage1: TJvFormStorage;
@@ -158,6 +161,7 @@ begin
   oOptions := [];
   // Items to cleanup
   if cbCleanVerInfo.Checked then Include(oOptions, coVerInfo);
+  if cbCleanObsoleteVerinfo.Checked then Include(oOptions, coOldVerInfo);
   if cbCleanMainIcon.Checked then Include(oOptions, coMainIcon);
   if cbCleanManifest.Checked then Include(oOptions, coManifest);
 
@@ -166,6 +170,8 @@ begin
     // Backup optie nog toevoegen
     if cbCreateBackup.Checked then Include(oOptions, coCreateBackup);
     if cbCreateLog.Checked then Include(oOptions, coCreateLog);
+    if cbOldStyleXMLFormat.Checked then Include(oOptions, coOldStyleXMLformat);
+
     Result := True;
   end else
     Result := False;
@@ -245,8 +251,7 @@ const
 var
   I, J: Integer;
   vCondition: Variant;
-  _PropertyNode, _CurSubNode: IXMLNode;
-  _Root: IXMLNode;
+  _Root, _PropertyNode, _CurSubNode, _Node: IXMLNode;
   _Log: TStrings;
   _FileStrings: TStrings;
 begin
@@ -260,10 +265,11 @@ begin
   _Root := XMLDocument1.DocumentElement;
   _Log := TStringList.Create;
   try
-    // Loop thru PropertyGroups
     for I := 0 to _Root.ChildNodes.Count - 1 do
     begin
       _PropertyNode := _Root.ChildNodes[I];
+
+      // Loop thru PropertyGroups for 'inherited' info cleanup
       if SameText('PropertyGroup', _PropertyNode.NodeName) then
       begin
         vCondition := _PropertyNode.Attributes['Condition'];
@@ -304,6 +310,31 @@ begin
             end;
           end;
         end;
+      end else
+        // Check 'old' obsolete versioninfo keys
+        if (coOldVerInfo in aCleanupOptions) and
+           SameText('ProjectExtensions', _PropertyNode.NodeName) then
+      begin
+        _Node := _PropertyNode.ChildNodes.FindNode('BorlandProject');
+        if not Assigned(_Node) then Continue; // Next node
+        _Node := _Node.ChildNodes.FindNode('Delphi.Personality');
+        if not Assigned(_Node) then Continue; // Next node
+
+        _CurSubNode := _Node.ChildNodes.FindNode('VersionInfo');
+        if Assigned(_CurSubNode) then
+        begin
+          _Log.Add('- Removed: ' + _CurSubNode.XML);
+          _Node.ChildNodes.Remove(_CurSubNode);
+          Result := True;
+        end;
+
+        _CurSubNode := _Node.ChildNodes.FindNode('VersionInfoKeys');
+        if Assigned(_CurSubNode) then
+        begin
+          _Log.Add('- Removed: ' + _CurSubNode.XML);
+          _Node.ChildNodes.Remove(_CurSubNode);
+          Result := True;
+        end;
       end;
     end;
 
@@ -342,7 +373,12 @@ begin
     try
       _FileStrings.LoadFromFile(aFilename);
       for I := 0 to _FileStrings.Count - 1 do
-        _FileStrings[I] := #9 + _FileStrings[I]; // Extra tab toevoegen voor elke regel
+      begin
+        if (coOldStyleXMLformat in aCleanupOptions) then
+          _FileStrings[I] := #9 + _FileStrings[I] // Add extra tab at the beginning of the line
+        else
+          _FileStrings[I] := StringReplace(_FileStrings[I], #9, '    ', [rfReplaceAll]); // Replace tabs by 4 spaces
+      end;
       _FileStrings.SaveToFile(aFilename);
     finally
       _FileStrings.Free;
