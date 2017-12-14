@@ -12,6 +12,8 @@ type
   TCleanOptions = set of (coCreateBackup, coCreateLog, coOldStyleXMLformat,
                           coVerInfo, coOldVerInfo, coMainIcon, coManifest);
 
+  TProcessResult = (prNotEdited, prEdited, prError);
+
   TfrmMain = class(TForm)
     ActionList1: TActionList;
     actnAddProjects: TFileOpen;
@@ -43,14 +45,19 @@ type
     procedure FormCreate(Sender: TObject);
     procedure JvFormStorage1RestorePlacement(Sender: TObject);
     procedure JvFormStorage1SavePlacement(Sender: TObject);
+    procedure lvProjectsCustomDrawItem(Sender: TCustomListView; Item: TListItem;
+        State: TCustomDrawState; var DefaultDraw: Boolean);
     procedure WMDropFiles(var Message: TWMDropFiles); message WM_DROPFILES;
   private
+    FBasePath: string;
     procedure AddFile(const aFilename: string);
     procedure AddGroupProjects(const aFilename: string);
     procedure AddProject(const aFilename: string);
     function GetCleanOptions(out oOptions: TCleanOptions): Boolean;
+    function GetFullFilename(const aFilename: string): string;
+    function GetShortPath(const aFilename: string): string;
     function ProcessProject(const aFilename: string; aCleanupOptions:
-        TCleanOptions): Boolean;
+        TCleanOptions): TProcessResult;
     procedure ProjectCountUpdated;
   protected
     procedure ListItemsDeleteItem(Sender: TJvCustomAppStorage; const Path: string;
@@ -67,7 +74,7 @@ var
 implementation
 
 uses
-  Dialogs, ShellApi;
+  Dialogs, ShellApi, System.UITypes;
 
 {$R *.dfm}
 
@@ -92,9 +99,10 @@ begin
     for I := 0 to lvProjects.Items.Count - 1 do
     begin
       lvProjects.Items[I].SubItems.Clear;
-      if ProcessProject(lvProjects.Items[I].Caption, _CleanOptions) then
-        lvProjects.Items[I].SubItems.Add('*');
-
+      case ProcessProject(lvProjects.Items[I].Caption, _CleanOptions) of
+        prEdited: lvProjects.Items[I].SubItems.Add('*');
+        prError : lvProjects.Items[I].SubItems.Add('!');
+      end;
       ProgressBar1.StepBy(1);
     end;
     lvProjects.Invalidate;
@@ -154,6 +162,8 @@ procedure TfrmMain.FormCreate(Sender: TObject);
 begin
   DragAcceptFiles(Handle, True);
   JvAppIniFileStorage1.FileName := ChangeFileExt(Application.ExeName, '.ini');
+  // Basismap is op dit moment de map van de applicatie
+  FBasePath := ExcludeTrailingPathDelimiter(ExtractFilePath(Application.ExeName));
 end;
 
 function TfrmMain.GetCleanOptions(out oOptions: TCleanOptions): Boolean;
@@ -175,6 +185,24 @@ begin
     Result := True;
   end else
     Result := False;
+end;
+
+function TfrmMain.GetFullFilename(const aFilename: string): string;
+begin
+  if (Copy(aFilename, 1, 2) = '.\') and (FBasePath > '') then
+    Result := FBasePath + Copy(aFilename, 2, Length(aFilename))
+  else
+    Result := aFilename;
+end;
+
+function TfrmMain.GetShortPath(const aFilename: string): string;
+begin
+  // Haal de huidige locatie van de applicatie uit het path, mits
+  // dat er in opgenomen!
+  if (FBasePath > '') and SameText(Copy(aFilename, 1, Length(FBasePath)), FBasePath) then
+    Result := '.' + Copy(aFileName, Length(FBasePath) + 1, Length(aFilename))
+  else
+    Result := aFilename;
 end;
 
 procedure TfrmMain.JvFormStorage1RestorePlacement(Sender: TObject);
@@ -219,13 +247,16 @@ procedure TfrmMain.ListItemsReadItem(Sender: TJvCustomAppStorage; const Path:
     string; const List: TObject; const Index: Integer; const ItemName: string);
 var
   NewItem: TListItem;
-  NewPath: string;
+  NewPath, sFileName: String;
 begin
   if List is TListItems then
   begin
     NewPath := Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]);
+    sFileName := GetFullFilename(Sender.ReadString(NewPath));
     NewItem := TListItems(List).Add;
-    NewItem.Caption := Sender.ReadString(NewPath);
+    NewItem.Caption := sFilename;
+    if not FileExists(sFilename) then
+      NewItem.SubItems.Add('!');
     // Sender.ReadPersistent(NewPath, NewItem);
   end;
 end;
@@ -239,13 +270,22 @@ begin
   begin
     Item := TListItems(List).Item[Index];
     if Assigned(Item) then
-      Sender.WriteString(Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]), Item.Caption);
+      Sender.WriteString(Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]), GetShortPath(Item.Caption));
       // Sender.WritePersistent(Sender.ConcatPaths([Path, Sender.ItemNameIndexPath (ItemName, Index)]), TPersistent(Item));
   end;
 end;
 
+procedure TfrmMain.lvProjectsCustomDrawItem(Sender: TCustomListView; Item:
+    TListItem; State: TCustomDrawState; var DefaultDraw: Boolean);
+begin
+  if not FileExists(Item.Caption) then
+    Sender.Canvas.Font.Color := TColors.Grey
+  else
+    Sender.Canvas.Font.Color := TColors.SysWindowText; // Sender.Font.Color;
+end;
+
 function TfrmMain.ProcessProject(const aFilename: string; aCleanupOptions:
-    TCleanOptions): Boolean;
+    TCleanOptions): TProcessResult;
 const
   sVerinfoPrefix = 'VerInfo_';
 var
@@ -256,15 +296,17 @@ var
   _FileStrings: TStrings;
 begin
   // Open file
-  Result := False;
+  Result := prNotEdited;
   try
     XMLDocument1.LoadFromFile(aFilename);
   except
-    Exit;
+    Exit(prError);
   end;
-  _Root := XMLDocument1.DocumentElement;
-  _Log := TStringList.Create;
+
   try
+    _Root := XMLDocument1.DocumentElement;
+    _Log := TStringList.Create;
+
     for I := 0 to _Root.ChildNodes.Count - 1 do
     begin
       _PropertyNode := _Root.ChildNodes[I];
@@ -288,7 +330,7 @@ begin
               _Log.Add('- Removed: ' + _CurSubNode.XML);
               _CurSubNode := nil;
               _PropertyNode.ChildNodes.Delete(J);
-              Result := True;
+              Result := prEdited;
             end else
               if SameText(_CurSubNode.NodeName, 'Icon_MainIcon') then
             begin
@@ -297,7 +339,7 @@ begin
               _Log.Add('- Removed: ' + _CurSubNode.XML);
               _CurSubNode := nil;
               _PropertyNode.ChildNodes.Delete(J);
-              Result := True;
+              Result := prEdited;
             end else
               if SameText(_CurSubNode.NodeName, 'Manifest_File') then
             begin
@@ -306,7 +348,7 @@ begin
               _Log.Add('- Removed: ' + _CurSubNode.XML);
               _CurSubNode := nil;
               _PropertyNode.ChildNodes.Delete(J);
-              Result := True;
+              Result := prEdited;
             end;
           end;
         end;
@@ -325,7 +367,7 @@ begin
         begin
           _Log.Add('- Removed: ' + _CurSubNode.XML);
           _Node.ChildNodes.Remove(_CurSubNode);
-          Result := True;
+          Result := prEdited;
         end;
 
         _CurSubNode := _Node.ChildNodes.FindNode('VersionInfoKeys');
@@ -333,13 +375,13 @@ begin
         begin
           _Log.Add('- Removed: ' + _CurSubNode.XML);
           _Node.ChildNodes.Remove(_CurSubNode);
-          Result := True;
+          Result := prEdited;
         end;
       end;
     end;
 
     // Are there modifications?
-    if Result then
+    if Result = prEdited then
     begin
       // If file is readonly, ask to overwrite it and remove readonly attribute...
       if (FileGetAttr(aFilename, False) and faReadOnly) <> 0 then
@@ -347,7 +389,7 @@ begin
         if Application.MessageBox(PChar(Format('Overwrite readonly file "%s"', [ExtractFileName(aFilename)])), 'Confirm', MB_ICONQUESTION or MB_YESNO) = ID_YES then
           FileSetAttr(aFilename, FileGetAttr(aFilename, False) - faReadOnly, False)
         else
-          Exit(False); // Exit
+          Exit(prNotEdited); // Exit
       end;
 
       // Create backup?
@@ -367,7 +409,7 @@ begin
   end;
 
   // Even format van Delphi hanteren (extra tab voor elke regel)
-  if Result then
+  if Result = prEdited then
   begin
     _FileStrings := TStringList.Create;
     try

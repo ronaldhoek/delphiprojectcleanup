@@ -67,6 +67,7 @@ object frmMain: TfrmMain
     RowSelect = True
     TabOrder = 2
     ViewStyle = vsReport
+    OnCustomDrawItem = lvProjectsCustomDrawItem
   end
   object btnAddProjects: TButton
     Left = 8
