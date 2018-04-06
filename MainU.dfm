@@ -65,6 +65,7 @@ object frmMain: TfrmMain
     MultiSelect = True
     ReadOnly = True
     RowSelect = True
+    SortType = stText
     TabOrder = 2
     ViewStyle = vsReport
     OnCustomDrawItem = lvProjectsCustomDrawItem
@@ -93,7 +94,6 @@ object frmMain: TfrmMain
     Action = actnExecute
     Anchors = [akLeft, akBottom]
     TabOrder = 4
-    ExplicitTop = 313
   end
   object ProgressBar1: TProgressBar
     Left = 111
@@ -102,7 +102,6 @@ object frmMain: TfrmMain
     Height = 17
     Anchors = [akLeft, akRight, akBottom]
     TabOrder = 5
-    ExplicitTop = 318
   end
   object GroupBox1: TGroupBox
     Left = 8
